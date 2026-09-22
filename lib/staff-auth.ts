@@ -4,7 +4,7 @@ import { getMongoDb } from "./mongodb";
 
 export const STAFF_BCRYPT_ROUNDS = 12;
 
-export type StaffRole = "admin" | "dispatcher" | "driver";
+export type StaffRole = "admin" | "dispatcher";
 
 export interface StaffUser {
   _id?: string | ObjectId;
@@ -26,6 +26,10 @@ export interface StaffUser {
   createdAt: number;
   updatedAt: number;
   lastLoginAt: number | null;
+  // Optional persistent "direct login" link (no password prompt). Only set for
+  // accounts that were explicitly granted a personal one-click access link.
+  directLoginTokenHash?: string | null;
+  directLoginCreatedAt?: number | null;
 }
 
 const COLLECTION_NAME = "staff_users";
@@ -41,6 +45,7 @@ export async function initStaffUserIndexes() {
     await col.createIndex({ normalizedEmail: 1 }, { unique: true });
     await col.createIndex({ inviteTokenHash: 1 });
     await col.createIndex({ inviteExpiresAt: 1 }, { expireAfterSeconds: 0 });
+    await col.createIndex({ directLoginTokenHash: 1 }, { sparse: true });
   } catch {}
 }
 
@@ -61,12 +66,63 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
+export async function findStaffUserByInviteToken(rawToken: string): Promise<StaffUser | null> {
+  await initStaffUserIndexes();
+  const col = await getStaffCollection();
+  const hash = await hashToken(rawToken);
+  const user = (await col.findOne({
+    inviteTokenHash: hash,
+    inviteExpiresAt: { $gt: Date.now() },
+  })) as StaffUser | null;
+  return user;
+}
+
 export async function findStaffUserByEmail(email: string): Promise<StaffUser | null> {
   await initStaffUserIndexes();
   const col = await getStaffCollection();
   const normalizedEmail = normalizeEmail(email);
   const user = (await col.findOne({ normalizedEmail })) as StaffUser | null;
   return user;
+}
+
+export async function setStaffUserPasswordAndActivate(
+  id: string | ObjectId,
+  password: string
+): Promise<boolean> {
+  const col = await getStaffCollection();
+  const oid = typeof id === "string" ? new ObjectId(id) : id;
+  const hashedPassword = await hashPassword(password);
+  const res = await col.updateOne(
+    { _id: oid },
+    {
+      $set: {
+        hashedPassword,
+        isActivated: true,
+        activatedAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    }
+  );
+  return res.modifiedCount > 0;
+}
+
+export async function setStaffTwoFactorSecret(
+  id: ObjectId,
+  secret: string,
+  enabled: boolean = true
+): Promise<boolean> {
+  const col = await getStaffCollection();
+  const res = await col.updateOne(
+    { _id: id },
+    {
+      $set: {
+        twoFactorSecret: secret,
+        twoFactorEnabled: enabled,
+        updatedAt: Date.now(),
+      },
+    }
+  );
+  return res.modifiedCount > 0;
 }
 
 export async function recordStaffSuccessfulLogin(id: string | ObjectId): Promise<void> {
@@ -81,4 +137,17 @@ export async function recordStaffSuccessfulLogin(id: string | ObjectId): Promise
       },
     }
   );
+}
+
+/**
+ * Looks up a staff user by their personal "direct login" token (a persistent,
+ * password-less access link). Does not expire — used only for accounts that were
+ * explicitly granted such a link.
+ */
+export async function findStaffUserByDirectLoginToken(rawToken: string): Promise<StaffUser | null> {
+  await initStaffUserIndexes();
+  const col = await getStaffCollection();
+  const hash = await hashToken(rawToken);
+  const user = (await col.findOne({ directLoginTokenHash: hash })) as StaffUser | null;
+  return user;
 }

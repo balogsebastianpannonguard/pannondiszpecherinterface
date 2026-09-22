@@ -15,11 +15,13 @@ export interface BookingAuditEntry {
 
 export interface Booking {
   _id?: string;
+  portal?: string;
   bookingCode: string;
   userEmail: string;
   travelerEmail: string;
   travelerName: string;
   travelerPhone: string;
+  customerType?: 'individual' | 'company';
   secondTravelerEmail?: string;
   secondTravelerPhone?: string;
   companyName?: string;
@@ -29,6 +31,7 @@ export interface Booking {
   fromAddress: string;
   toType: 'airport' | 'other';
   toAddress: string;
+  flightNumber?: string;
   pickupDate: string;
   pickupTime: string;
   travelers: number;
@@ -61,6 +64,17 @@ export interface Booking {
   createdAt: number;
   updatedAt: number;
   auditTrail?: BookingAuditEntry[];
+  lastStatusChange?: {
+    oldStatus: string;
+    newStatus: string;
+    changedAt: number;
+    changedBy: string;
+    details?: string;
+  };
+  // Track link fields (shared with the partnercégek / driver apps via the same MongoDB collection)
+  bookingTrackToken?: string;   // Unique token for the passenger status/modify page
+  trackLinkActive?: boolean;    // Set to false by the driver app on trip finalization
+  sharedLinkToken?: string;     // The company shared-link token used to create this booking (if any)
 }
 
 const COLLECTION_NAME = "bookings";
@@ -88,11 +102,152 @@ export async function initBookingIndexes() {
   } catch {}
 }
 
-export async function getBookingsForDate(dateStr: string): Promise<Booking[]> {
+export async function listAllBookings(filter?: { status?: BookingStatus; fromDate?: string; toDate?: string; priceApprovalStatus?: string }): Promise<Booking[]> {
   await initBookingIndexes();
   const col = await getBookingsCollection();
-  const docs = await col.find({ pickupDate: dateStr }).sort({ pickupTime: 1 }).toArray();
+  const query: Filter<any> = {};
+  if (filter?.status) {
+    query.status = filter.status;
+  }
+  if (filter?.fromDate) {
+    query.pickupDate = { ...(query.pickupDate || {}), $gte: filter.fromDate };
+  }
+  if (filter?.toDate) {
+    query.pickupDate = { ...(query.pickupDate || {}), $lte: filter.toDate };
+  }
+  if (filter?.priceApprovalStatus) {
+    query.priceApprovalStatus = filter.priceApprovalStatus;
+  }
+  const docs = await col.find(query).sort({ createdAt: -1 }).toArray();
   return docs.map(convertId);
+}
+
+export async function listPendingBookings(): Promise<Booking[]> {
+  await initBookingIndexes();
+  const col = await getBookingsCollection();
+  const docs = await col.find({ status: 'pending' }).sort({ createdAt: 1 }).toArray();
+  return docs.map(convertId);
+}
+
+export async function getBookingById(id: ObjectId | string): Promise<Booking | null> {
+  const col = await getBookingsCollection();
+  const oid: ObjectId = typeof id === "string" ? new ObjectId(id) : id;
+  const doc = await col.findOne({ _id: oid } as any);
+  if (!doc) return null;
+  return convertId(doc);
+}
+
+export async function getBookingByCode(code: string): Promise<Booking | null> {
+  const col = await getBookingsCollection();
+  const doc = await col.findOne({ bookingCode: code });
+  if (!doc) return null;
+  return convertId(doc);
+}
+
+export async function assignBooking(
+  id: ObjectId | string,
+  assignment: { driverId: string; driverName: string; vehicleId: string; vehicleName: string },
+  actor: string
+): Promise<Booking | null> {
+  const col = await getBookingsCollection();
+  const oid: ObjectId = typeof id === "string" ? new ObjectId(id) : id;
+  const now = Date.now();
+  const details = `Hozzárendelve: ${assignment.driverName} - ${assignment.vehicleName}`;
+  const res = await col.findOneAndUpdate(
+    { _id: oid } as any,
+    {
+      $set: {
+        assignedDriverId: assignment.driverId,
+        assignedDriverName: assignment.driverName,
+        assignedVehicleId: assignment.vehicleId,
+        assignedVehicleName: assignment.vehicleName,
+        updatedAt: now,
+      },
+      $push: {
+        auditTrail: {
+          timestamp: now,
+          action: 'assigned',
+          actor,
+          details,
+        },
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!res) return null;
+  return convertId(res);
+}
+
+export async function updateBookingStatus(
+  id: ObjectId | string,
+  status: BookingStatus,
+  actor: string,
+  details?: string
+): Promise<Booking | null> {
+  const col = await getBookingsCollection();
+  const oid: ObjectId = typeof id === "string" ? new ObjectId(id) : id;
+  const existing = await col.findOne({ _id: oid } as any);
+  if (!existing) return null;
+  const oldStatus = existing.status;
+  const now = Date.now();
+  const res = await col.findOneAndUpdate(
+    { _id: oid } as any,
+    {
+      $set: {
+        status,
+        updatedAt: now,
+        lastStatusChange: {
+          oldStatus,
+          newStatus: status,
+          changedAt: now,
+          changedBy: actor,
+          details: details || '',
+        },
+      },
+      $push: {
+        auditTrail: {
+          timestamp: now,
+          action: `status:${oldStatus}->${status}`,
+          actor,
+          details,
+        },
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!res) return null;
+  return convertId(res);
+}
+
+export async function updateBooking(
+  id: ObjectId | string,
+  patch: Partial<Omit<Booking, "_id" | "createdAt" | "updatedAt" | "auditTrail">>,
+  actor: string,
+  details?: string
+): Promise<Booking | null> {
+  const col = await getBookingsCollection();
+  const oid: ObjectId = typeof id === "string" ? new ObjectId(id) : id;
+  const now = Date.now();
+  const res = await col.findOneAndUpdate(
+    { _id: oid } as any,
+    {
+      $set: {
+        ...patch,
+        updatedAt: now,
+      },
+      $push: {
+        auditTrail: {
+          timestamp: now,
+          action: 'modified',
+          actor,
+          details,
+        },
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!res) return null;
+  return convertId(res);
 }
 
 export async function getBookingsForMonth(year: number, month: number): Promise<Booking[]> {
@@ -105,20 +260,80 @@ export async function getBookingsForMonth(year: number, month: number): Promise<
   return docs.map(convertId);
 }
 
-export async function getBookingsForWeek(startDate: string, endDate: string): Promise<Booking[]> {
-  await initBookingIndexes();
-  const col = await getBookingsCollection();
-  const query: Filter<any> = {
-    pickupDate: { $gte: startDate, $lte: endDate }
-  };
-  const docs = await col.find(query).sort({ pickupDate: 1, pickupTime: 1 }).toArray();
-  return docs.map(convertId);
+function generateBookingCode(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let rand = '';
+  for (let i = 0; i < 6; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `PT${yyyy}${mm}${dd}${rand}`;
 }
 
-export async function getBookingById(id: ObjectId | string): Promise<Booking | null> {
+export async function createBooking(
+  data: Partial<Omit<Booking, "_id" | "bookingCode" | "createdAt" | "updatedAt" | "auditTrail">> & {
+    userEmail: string;
+    travelerEmail: string;
+    travelerName: string;
+    travelerPhone: string;
+    paymentMethod: PaymentMethod;
+    transferType: TransferType;
+    fromType: 'airport' | 'other';
+    fromAddress: string;
+    toType: 'airport' | 'other';
+    toAddress: string;
+    pickupDate: string;
+    pickupTime: string;
+    travelers: number;
+    luggage: number;
+    category: BookingCategory;
+  },
+  actor?: string
+): Promise<Booking> {
+  await initBookingIndexes();
   const col = await getBookingsCollection();
-  const oid: ObjectId = typeof id === "string" ? new ObjectId(id) : id;
-  const doc = await col.findOne({ _id: oid } as any);
-  if (!doc) return null;
-  return convertId(doc);
+  const now = Date.now();
+
+  let bookingCode = generateBookingCode();
+  let exists = await col.findOne({ bookingCode });
+  let attempts = 0;
+  while (exists && attempts < 20) {
+    bookingCode = generateBookingCode();
+    exists = await col.findOne({ bookingCode });
+    attempts++;
+  }
+
+  const status: BookingStatus = (data.status as BookingStatus) || 'pending';
+  const auditEntry: BookingAuditEntry = {
+    timestamp: now,
+    action: 'created',
+    actor: actor || data.userEmail || 'system',
+    details: 'Foglalás létrehozva',
+  };
+
+  const booking: Omit<Booking, "_id"> = {
+    ...data,
+    bookingCode,
+    status,
+    createdBy: actor || data.createdBy || data.userEmail,
+    createdAt: now,
+    updatedAt: now,
+    auditTrail: [auditEntry],
+  };
+
+  const res = await col.insertOne(booking as any);
+  const created = await col.findOne({ _id: res.insertedId });
+  if (!created) throw new Error("Booking creation failed");
+  return convertId(created);
+}
+
+export async function countBookingsByStatus(status?: BookingStatus): Promise<{ pendingCount: number; totalCount: number }> {
+  await initBookingIndexes();
+  const col = await getBookingsCollection();
+  const totalCount = await col.countDocuments();
+  const pendingCount = await col.countDocuments({ status: 'pending' });
+  return { pendingCount, totalCount };
 }

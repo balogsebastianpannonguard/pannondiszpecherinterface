@@ -1,6 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 const inter = Inter({
   variable: "--font-custom-sans",
@@ -15,8 +25,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Pannon Transfer · Diszpécser Naptár",
-  description: "Pannon Transfer diszpécseri naptár alkalmazás. Foglalások és menetrendek kezelése egyszerűen, mobilról.",
+  title: "Pannon Transfer · Diszpécser Központ",
+  description: "Pannon Transfer kölcsönös partnerek részére létrehozott diszpécseri adminisztrációs felület. Foglalások, partnerkezelés, napi menetrend és live nyomon követés.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -42,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="hu">
       <body
-        className={`${inter.variable} ${playfair.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfair.variable} antialiased min-h-screen`}
       >
         {children}
       </body>

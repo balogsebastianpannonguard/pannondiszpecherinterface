@@ -6,6 +6,7 @@ import {
   getDispatcherProfile,
   type DispatcherUser,
 } from "@/lib/auth";
+import { createAuditLog } from "@/lib/audit-logs";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +36,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 2FA check: ha kötelező de még nincs bekapcsolva, akkor is engedjük a belépést,
+    // de a frontend értesíti a felhasználót, hogy be kell kapcsolnia.
+    // Egy másik megközelítés: most a sessionbe beleírjuk az requireTwoFactor és twoFactorEnabled mezőket.
+
     const user: DispatcherUser = await getDispatcherProfile(result.user);
     const token = createSessionToken(user, remember);
     await setSessionCookie(token, remember);
+    await createAuditLog({
+      timestamp: Date.now(),
+      action: "auth.login",
+      actor: user.email,
+      details: JSON.stringify({ role: user.role }),
+    });
 
     return NextResponse.json({
       success: true,
@@ -47,6 +58,9 @@ export async function POST(request: NextRequest) {
         role: user.role,
         company: user.company,
         loginAt: user.loginAt,
+        requireTwoFactor: !!user.requireTwoFactor,
+        twoFactorEnabled: !!user.twoFactorEnabled,
+        staffId: user.staffId,
       },
     });
   } catch (err) {

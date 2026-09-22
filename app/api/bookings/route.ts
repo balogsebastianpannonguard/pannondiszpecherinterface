@@ -1,32 +1,109 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth";
-import { getBookingsForMonth } from "@/lib/bookings";
+import {
+  listAllBookings,
+  createBooking,
+  countBookingsByStatus,
+  type BookingStatus,
+} from "@/lib/bookings";
+import { createAuditLog } from "@/lib/audit-logs";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const user = await getCurrentSession();
+  if (!user) {
+    return NextResponse.json({ error: "Nincs jogosultságod" }, { status: 401 });
+  }
+
   try {
-    const user = await getCurrentSession();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
-    const yearStr = searchParams.get("year");
-    const monthStr = searchParams.get("month");
+    const status = searchParams.get("status") as BookingStatus | undefined;
+    const fromDate = searchParams.get("fromDate") || undefined;
+    const toDate = searchParams.get("toDate") || undefined;
+    const priceApprovalStatus = searchParams.get("priceApprovalStatus") || undefined;
 
-    if (!yearStr || !monthStr) {
-      return NextResponse.json({ error: "Missing year/month" }, { status: 400 });
+    const filter: { status?: BookingStatus; fromDate?: string; toDate?: string; priceApprovalStatus?: string } = {};
+    if (status) filter.status = status;
+    if (fromDate) filter.fromDate = fromDate;
+    if (toDate) filter.toDate = toDate;
+    if (priceApprovalStatus) filter.priceApprovalStatus = priceApprovalStatus;
+
+    const bookings = await listAllBookings(filter);
+    const { pendingCount, totalCount } = await countBookingsByStatus();
+
+    return NextResponse.json({
+      bookings,
+      meta: {
+        pendingCount,
+        totalCount,
+      },
+    });
+  } catch (err) {
+    console.error("[bookings GET error]", err);
+    return NextResponse.json({ error: "Szerver hiba" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getCurrentSession();
+  if (!user) {
+    return NextResponse.json({ error: "Nincs jogosultságod" }, { status: 401 });
+  }
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as Record<string, any>;
+
+    const requiredFields = [
+      "userEmail",
+      "travelerEmail",
+      "travelerName",
+      "travelerPhone",
+      "paymentMethod",
+      "transferType",
+      "fromType",
+      "fromAddress",
+      "toType",
+      "toAddress",
+      "pickupDate",
+      "pickupTime",
+      "travelers",
+      "luggage",
+      "category",
+    ];
+
+    for (const field of requiredFields) {
+      if (body[field] === undefined || body[field] === null || body[field] === "") {
+        return NextResponse.json(
+          { error: `Hiányzó mező: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+    if ((body.toType === "airport" || body.fromType === "airport") && !String(body.flightNumber || "").trim()) {
+      return NextResponse.json(
+        { error: "Reptéri transzfernél a járatszám megadása kötelező." },
+        { status: 400 }
+      );
     }
 
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10); // 0-indexed
+    const booking = await createBooking(body as any, user.email);
 
-    const bookings = await getBookingsForMonth(year, month);
+    await createAuditLog({
+      timestamp: Date.now(),
+      action: "booking.created",
+      actor: user.email,
+      targetType: "booking",
+      targetId: booking._id,
+      details: JSON.stringify({
+        bookingCode: booking.bookingCode,
+        travelerName: booking.travelerName,
+      }),
+    });
 
-    return NextResponse.json({ success: true, bookings });
+    return NextResponse.json({ booking }, { status: 201 });
   } catch (err) {
-    console.error("[Bookings API Error]", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("[bookings POST error]", err);
+    return NextResponse.json({ error: "Szerver hiba" }, { status: 500 });
   }
 }

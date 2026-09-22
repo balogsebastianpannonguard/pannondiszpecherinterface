@@ -6,14 +6,14 @@ import {
   recordStaffSuccessfulLogin,
 } from "./staff-auth";
 
-export const AUTH_COOKIE_NAME = "pannon_dispatcher_mobile_session";
+export const AUTH_COOKIE_NAME = "pannon_dispatcher_session";
 export const DISPATCHER_COOKIE_SECRET =
   process.env.DISPATCHER_COOKIE_SECRET || "pannon_transfer_dispatcher_super_secret_2026_jwt_key";
 
 export interface DispatcherUser {
   email: string;
   name: string;
-  role: "dispatcher" | "admin" | "partner" | "driver";
+  role: "dispatcher" | "admin" | "partner";
   company?: string;
   loginAt: number;
   requireTwoFactor?: boolean;
@@ -62,13 +62,13 @@ export async function verifyCredentials(
     };
   }
 
-  // MongoDB staff users
+  // MongoDB staff users (role = dispatcher)
   try {
     const user = await findStaffUserByEmail(email);
     if (!user) {
       return { success: false, message: "Hibás e-mail cím vagy jelszó." };
     }
-    if (user.role !== "dispatcher" && user.role !== "admin" && user.role !== "driver") {
+    if (user.role !== "dispatcher" && user.role !== "admin") {
       return { success: false, message: "Nincs jogosultságod a Diszpécser Központba." };
     }
     if (!user.isActivated || !user.hashedPassword) {
@@ -123,7 +123,7 @@ export async function getDispatcherProfile(user?: DispatcherUser): Promise<Dispa
 }
 
 export function createSessionToken(user: DispatcherUser, remember: boolean = true): string {
-  const expiresIn = remember ? "7d" : "1d";
+  const expiresIn = remember ? "3d" : "12h";
   return jwt.sign(user as object, DISPATCHER_COOKIE_SECRET, { expiresIn });
 }
 
@@ -137,13 +137,12 @@ export function verifySessionToken(token: string): DispatcherUser | null {
 
 export async function setSessionCookie(token: string, remember: boolean = true) {
   const cookieStore = await cookies();
-  const maxAge = remember ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 1;
   cookieStore.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge,
+    ...(remember ? { maxAge: 60 * 60 * 24 * 3 } : {}),
   });
 }
 
