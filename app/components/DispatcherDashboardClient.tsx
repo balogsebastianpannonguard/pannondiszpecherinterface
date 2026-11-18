@@ -308,6 +308,22 @@ function statusColor(status: BookingStatus) {
   }
 }
 
+/** Naptár csempék színe a foglalás státusza szerint (nem kategória/partner szerint). */
+function statusTileGradient(status: string) {
+  switch (status) {
+    case "pending":
+      return "from-rose-500 to-red-500 shadow-rose-500/30";
+    case "modified":
+      return "from-amber-500 to-yellow-500 shadow-amber-500/30";
+    case "completed":
+      return "from-emerald-500 to-teal-500 shadow-emerald-500/30";
+    case "cancelled":
+      return "from-slate-900 to-black shadow-slate-900/30";
+    default: // confirmed, in-progress = Értesítve
+      return "from-blue-500 to-indigo-500 shadow-blue-500/30";
+  }
+}
+
 function categoryGradient(
   cat: BookingCategory,
   isNewOrModified: boolean = false,
@@ -1617,7 +1633,6 @@ export default function DispatcherDashboardClient({
                           {/* Bookings list */}
                           <div className="flex-1 space-y-1.5 overflow-hidden">
                             {bookings.slice(0, 4).map((b) => {
-                              const isNewOrMod = b.status === "pending" || b.status === "modified";
                               const isNewBadge = isNewBooking(b);
                               return (
                                 <div
@@ -1627,7 +1642,7 @@ export default function DispatcherDashboardClient({
                                     markAsViewed(b.id);
                                     router.push(`/bookings/${b.id}`);
                                   }}
-                                  className={`relative pl-2 pr-1.5 py-1 rounded-lg text-[10px] leading-tight font-semibold bg-gradient-to-r ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} text-white shadow-sm cursor-pointer hover:brightness-105 transition`}
+                                  className={`relative pl-2 pr-1.5 py-1 rounded-lg text-[10px] leading-tight font-semibold bg-gradient-to-r ${statusTileGradient(b.status)} text-white shadow-sm cursor-pointer hover:brightness-105 transition`}
                                 >
                                   {isNewBadge && (
                                     <span className="absolute -top-0.5 -left-0.5 px-1 py-[1px] rounded bg-white text-blue-700 text-[7px] font-black shadow-sm border border-blue-200">
@@ -1681,7 +1696,6 @@ export default function DispatcherDashboardClient({
                                     .sort((a, b) => a.time.localeCompare(b.time))
                                     .map((b) => {
                                       const s = statusColor(b.status);
-                                      const isNewOrMod = b.status === "pending" || b.status === "modified";
                                       const isNewBadge = isNewBooking(b);
                                       return (
                                         <div
@@ -1693,9 +1707,9 @@ export default function DispatcherDashboardClient({
                                           }}
                                           className="group relative flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3 cursor-pointer hover:shadow-md hover:border-slate-300 hover:-translate-y-[1px] transition-all overflow-hidden"
                                         >
-                                          <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)}`} />
+                                          <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${statusTileGradient(b.status)}`} />
 
-                                          <div className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} shadow-md flex flex-col items-center justify-center text-white relative`}>
+                                          <div className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${statusTileGradient(b.status)} shadow-md flex flex-col items-center justify-center text-white relative`}>
                                             {isNewBadge && (
                                               <span className="absolute -top-1 -right-1 px-1 py-[1px] rounded bg-white text-blue-700 text-[7px] font-black shadow-sm border border-blue-200">
                                                 ÚJ
@@ -1712,7 +1726,7 @@ export default function DispatcherDashboardClient({
                                                 <span className={`w-1 h-1 rounded-full ${s.dot} ${b.status === "in-progress" ? "animate-pulse" : ""}`} />
                                                 {s.label}
                                               </span>
-                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md bg-gradient-to-r ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} text-white text-[8.5px] font-black tracking-wider uppercase shadow-sm`}>
+                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md bg-gradient-to-r ${statusTileGradient(b.status)} text-white text-[8.5px] font-black tracking-wider uppercase shadow-sm`}>
                                                 {categoryLabel(b.category, b.partnerMeta)}
                                               </span>
                                             </div>
@@ -1950,7 +1964,6 @@ export default function DispatcherDashboardClient({
                           {/* Bookings list */}
                           <div className="space-y-1.5 overflow-hidden">
                               {bookings.slice(0, 3).map((b) => {
-                              const isNewOrMod = b.status === "pending" || b.status === "modified";
                               const isNewBadge = isNewBooking(b);
                               return (
                                 <div
@@ -1960,7 +1973,7 @@ export default function DispatcherDashboardClient({
                                     markAsViewed(b.id);
                                     router.push(`/bookings/${b.id}`);
                                   }}
-                                  className={`relative pl-2 pr-1.5 py-1 rounded-lg text-[10px] leading-tight font-semibold bg-gradient-to-r ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} text-white shadow-sm cursor-pointer hover:brightness-105 transition`}
+                                  className={`relative pl-2 pr-1.5 py-1 rounded-lg text-[10px] leading-tight font-semibold bg-gradient-to-r ${statusTileGradient(b.status)} text-white shadow-sm cursor-pointer hover:brightness-105 transition`}
                                 >
                                   {isNewBadge && (
                                     <span className="absolute -top-0.5 -left-0.5 px-1 py-[1px] rounded bg-white text-blue-700 text-[7px] font-black shadow-sm border border-blue-200">
@@ -2014,7 +2027,6 @@ export default function DispatcherDashboardClient({
                                     .sort((a, b) => a.time.localeCompare(b.time))
                                     .map((b) => {
                                       const s = statusColor(b.status);
-                                      const isNewOrMod = b.status === "pending" || b.status === "modified";
                                       const isNewBadge = isNewBooking(b);
                                       return (
                                         <div
@@ -2026,9 +2038,9 @@ export default function DispatcherDashboardClient({
                                           }}
                                           className="group relative flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3 cursor-pointer hover:shadow-md hover:border-slate-300 hover:-translate-y-[1px] transition-all overflow-hidden"
                                         >
-                                          <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)}`} />
+                                          <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${statusTileGradient(b.status)}`} />
 
-                                          <div className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} shadow-md flex flex-col items-center justify-center text-white relative`}>
+                                          <div className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${statusTileGradient(b.status)} shadow-md flex flex-col items-center justify-center text-white relative`}>
                                             {isNewBadge && (
                                               <span className="absolute -top-1 -right-1 px-1 py-[1px] rounded bg-white text-blue-700 text-[7px] font-black shadow-sm border border-blue-200">
                                                 ÚJ
@@ -2045,7 +2057,7 @@ export default function DispatcherDashboardClient({
                                                 <span className={`w-1 h-1 rounded-full ${s.dot} ${b.status === "in-progress" ? "animate-pulse" : ""}`} />
                                                 {s.label}
                                               </span>
-                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md bg-gradient-to-r ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} text-white text-[8.5px] font-black tracking-wider uppercase shadow-sm`}>
+                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md bg-gradient-to-r ${statusTileGradient(b.status)} text-white text-[8.5px] font-black tracking-wider uppercase shadow-sm`}>
                                                 {categoryLabel(b.category, b.partnerMeta)}
                                               </span>
                                             </div>
@@ -2151,16 +2163,15 @@ export default function DispatcherDashboardClient({
                         <ul className="p-4 space-y-3">
                           {selectedBookings.map((b) => {
                             const s = statusColor(b.status);
-                            const isNewOrMod = b.status === "pending" || b.status === "modified";
                             const isNewBadge = isNewBooking(b);
                             return (
                               <li
                                 key={b.id}
                                 className="group relative rounded-2xl border border-slate-200 bg-white hover:shadow-lg hover:border-slate-300 transition-all p-4 overflow-hidden"
                               >
-                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)}`} />
+                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b ${statusTileGradient(b.status)}`} />
                                 <div className="flex items-start gap-4 pl-2">
-                                  <div className={`shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} shadow-lg flex flex-col items-center justify-center text-white relative`}>
+                                  <div className={`shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br ${statusTileGradient(b.status)} shadow-lg flex flex-col items-center justify-center text-white relative`}>
                                     {isNewBadge && (
                                       <span className="absolute -top-1 -right-1 px-1 py-[1px] rounded bg-white text-blue-700 text-[8px] font-black shadow-sm border border-blue-200">
                                         ÚJ
@@ -2176,7 +2187,7 @@ export default function DispatcherDashboardClient({
                                         <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${b.status === "in-progress" ? "animate-pulse" : ""}`} />
                                         {s.label}
                                       </span>
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md bg-gradient-to-r ${categoryGradient(b.category, isNewOrMod, b.partnerMeta)} text-white text-[9.5px] font-black tracking-wider uppercase shadow-sm`}>
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md bg-gradient-to-r ${statusTileGradient(b.status)} text-white text-[9.5px] font-black tracking-wider uppercase shadow-sm`}>
                                         {categoryLabel(b.category, b.partnerMeta)}
                                       </span>
                                       {isNewBadge && (
