@@ -25,6 +25,8 @@ export interface Booking {
   customerType?: 'individual' | 'company';
   secondTravelerEmail?: string;
   secondTravelerPhone?: string;
+  // További utasok a fő utason kívül (a partnerportálon rögzítve)
+  additionalPassengers?: Array<{ name: string; email?: string; phone?: string; pickupAddress?: string }>;
   companyName?: string;
   paymentMethod: PaymentMethod;
   transferType: TransferType;

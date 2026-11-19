@@ -677,6 +677,30 @@ export default function BookingsListClient({
                             ) : (
                               <span className="text-slate-400 italic">Nincs megadva</span>
                             )}
+                            {b.additionalPassengers && b.additionalPassengers.length > 0 && (
+                              <div className="pt-2 mt-2 border-t border-slate-100 space-y-1.5">
+                                <div className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">
+                                  TOVÁBBI UTASOK
+                                </div>
+                                {b.additionalPassengers.map((passenger, passengerIndex) => (
+                                  <div key={passengerIndex}>
+                                    <div className="font-bold text-slate-800">
+                                      {passengerIndex + 2}. {passenger.name}
+                                    </div>
+                                    {passenger.phone && (
+                                      <a href={`tel:${passenger.phone}`} className="text-blue-600 hover:underline block">
+                                        {passenger.phone}
+                                      </a>
+                                    )}
+                                    {passenger.pickupAddress && (
+                                      <div className="text-amber-700 text-[12px]">
+                                        Felvételi hely: {passenger.pickupAddress}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div>

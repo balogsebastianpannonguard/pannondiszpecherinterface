@@ -84,6 +84,7 @@ export async function POST(
           luggage: booking.luggage,
           assignedVehicleName: booking.assignedVehicleName,
           comment: booking.comment,
+          additionalPassengers: booking.additionalPassengers,
         });
         const driverEmailResult = await sendEmail({
           to: assignedDriver.email,

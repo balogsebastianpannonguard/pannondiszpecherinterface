@@ -863,6 +863,25 @@ If you have any questions, reply to this email or contact us using the details b
 </html>`;
 }
 
+function escapeHtmlText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** További utasok blokk a sofőri levélhez; ha nincs további utas, üres szöveg (a levél változatlan marad). */
+function buildAdditionalPassengersBlock(
+  passengers?: Array<{ name: string; email?: string; phone?: string; pickupAddress?: string }>
+): string {
+  const list = (Array.isArray(passengers) ? passengers : []).filter((p) => p && typeof p.name === "string" && p.name.trim());
+  if (list.length === 0) return "";
+  const rows = list
+    .map((p, index) => {
+      const contact = [p.email ? escapeHtmlText(p.email) : "", p.phone ? escapeHtmlText(p.phone) : ""].filter(Boolean).join(" · ");
+      return `<div style="padding:8px 0;${index > 0 ? "border-top:1px solid #e2e8f0;" : ""}"><div style="font-size:14px;font-weight:800;">${index + 2}. ${escapeHtmlText(p.name)}</div>${contact ? `<div style="font-size:12px;color:#475569;margin-top:2px;">${contact}</div>` : ""}${p.pickupAddress ? `<div style="font-size:12px;margin-top:2px;"><strong style="color:#b45309;">Felvételi hely:</strong> ${escapeHtmlText(p.pickupAddress)}</div>` : ""}</div>`;
+    })
+    .join("");
+  return `<div style="margin-top:18px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:10px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#64748b;">További utasok</div>${rows}</div>`;
+}
+
 export function buildDriverAssignmentEmail(params: {
   bookingCode: string;
   driverName: string;
@@ -878,6 +897,8 @@ export function buildDriverAssignmentEmail(params: {
   luggage: number;
   assignedVehicleName?: string;
   comment?: string;
+  /** További utasok a fő utason kívül (név, elérhetőség, egyedi felvételi hely). */
+  additionalPassengers?: Array<{ name: string; email?: string; phone?: string; pickupAddress?: string }>;
 }): string {
   const {
     bookingCode,
@@ -928,6 +949,7 @@ export function buildDriverAssignmentEmail(params: {
             <tr><td style="padding:9px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">Utasok / csomagok</td><td align="right" style="padding:9px 0;border-bottom:1px solid #e2e8f0;font-weight:700;">${travelers} fő · ${luggage} db</td></tr>
             <tr><td style="padding:9px 0;color:#64748b;">Jármű</td><td align="right" style="padding:9px 0;font-weight:700;">${assignedVehicleName || "Nincs megadva"}</td></tr>
           </table>
+          ${buildAdditionalPassengersBlock(params.additionalPassengers)}
           ${comment ? `<div style="margin-top:18px;padding:14px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;line-height:1.6;"><strong>Diszpécseri megjegyzés:</strong><br>${comment}</div>` : ""}
           <div style="margin-top:24px;padding:14px 16px;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:13px;line-height:1.6;">Kérjük, nyisd meg a sofőri felületet, ellenőrizd az adatokat, majd nyomd meg a „Láttam az utat” gombot.</div>
         </td></tr>

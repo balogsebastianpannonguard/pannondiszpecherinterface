@@ -1458,6 +1458,54 @@ export default function BookingDetailClient({
                   </div>
                 )}
 
+                {booking.additionalPassengers && booking.additionalPassengers.length > 0 && (
+                  <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/70 to-white p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users2 className="w-4 h-4 text-slate-500" />
+                      <span className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-500">
+                        További utasok
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {booking.additionalPassengers.map((passenger, passengerIndex) => (
+                        <div key={passengerIndex} className="rounded-xl bg-white border border-slate-200 p-3 shadow-sm">
+                          <div className="text-[13px] font-black text-slate-800">
+                            {passengerIndex + 2}. {passenger.name}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {passenger.email && (
+                              <a
+                                href={`mailto:${passenger.email}`}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[12px] font-bold text-slate-700 hover:text-blue-600 hover:border-blue-200 transition"
+                              >
+                                <Mail className="w-3.5 h-3.5 text-slate-500" />
+                                <span className="truncate">{passenger.email}</span>
+                              </a>
+                            )}
+                            {passenger.phone && (
+                              <a
+                                href={`tel:${passenger.phone}`}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[12px] font-bold text-slate-700 hover:text-slate-900 hover:border-slate-300 transition"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-slate-500" />
+                                <span className="truncate">{passenger.phone}</span>
+                              </a>
+                            )}
+                          </div>
+                          {passenger.pickupAddress && (
+                            <div className="flex items-start gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[12px] font-bold text-amber-900">
+                              <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                              <span>
+                                Felvételi hely: {passenger.pickupAddress}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
